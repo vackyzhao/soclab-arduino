@@ -15,7 +15,19 @@
 | ZedBoard / Blink | 3972 B | 668 B | 通过 |
 | KR260 / SimpleTone | 8408 B | 2708 B | 通过 |
 
-此轮从本机 HTTP 提供与 release 相同的板卡包，工具从官方资产缓存安装。公开 GitHub 下载的安装验证另行记录。Windows 深目录测试复现 GCC 的路径长度问题，头文件本身完整；换短 data 目录后通过，见安装说明。
+此轮从本机 HTTP 提供与 release 相同的板卡包，工具从官方资产缓存安装。Windows 深目录测试复现 GCC 的路径长度问题，头文件本身完整；换短 data 目录后通过，见安装说明。当前实际 Windows Arduino sketchbook 也已升级到 0.2.0，使用工作目录中的最新 GCC/GDB，并实际编译 SimpleTone 通过。
+
+## GitHub 公开分发验证
+
+公开发布后独立下载 raw 索引、板卡 tar.bz2 和 SocAudio ZIP，读回内容与上传的发布包一致。
+
+Linux x64 的独立 data/user 目录从公开索引实际执行 `core install`，从 release 实际下载并安装 SocAudio ZIP。官方 Linux 编译器压缩包复用下载缓存，再由 CLI 按标准工具依赖正式安装。该环境没有手动 core、`platform.local.txt` 或 `compiler.path` 覆盖；PATH 只含 `/usr/bin:/bin`。
+
+- ZedBoard 与 KR260 分别实际编译 Blink、SimpleTone，四项全部通过；大小与上表一致。
+- 编译依赖文件确认使用独立 ZIP 安装到 user/libraries 的 SocAudio 0.2.0。
+- 标准工具目录中的 GDB 16.3 实际读取 SimpleTone ELF，入口为 `0xE0000000`。
+
+因此公开索引、平台下载、各主机工具依赖、独立库 ZIP 以及两种板型的正常编译流程已经过执行验证；macOS 和 Linux ARM64 仍未实机验证。
 
 ## 先前硬件逻辑仿真
 
