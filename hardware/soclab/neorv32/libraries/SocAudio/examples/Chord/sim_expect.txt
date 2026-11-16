@@ -1,0 +1,6 @@
+Chord
+chord C4-E4-G4
+stats C4-E4-G4 
+chord C4-E4-G4-C5
+stats C4-E4-G4-C5 
+chords done

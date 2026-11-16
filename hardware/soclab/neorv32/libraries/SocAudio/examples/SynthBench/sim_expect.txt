@@ -1,0 +1,11 @@
+SynthBench
+stats v0_unity
+stats v1_unity
+stats v1_mul
+stats v2_unity
+stats v2_mul
+stats v3_unity
+stats v3_mul
+stats v4_unity
+stats v4_mul
+bench done

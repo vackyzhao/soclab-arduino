@@ -1,0 +1,6 @@
+PinInterrupt
+pin 1
+RISING ok edges 1 pin 1
+FALLING ok
+CHANGE ok edges 1 pin 1
+done

@@ -1,0 +1,19 @@
+ToneScale
+note C4 midi 60 f 261.625 Hz
+stats C4
+note D4 midi 62 f 293.664 Hz
+stats D4
+note E4 midi 64 f 329.627 Hz
+stats E4
+note F4 midi 65 f 349.228 Hz
+stats F4
+note G4 midi 67 f 391.995 Hz
+stats G4
+note A4 midi 69 f 440.000 Hz
+stats A4
+note B4 midi 71 f 493.883 Hz
+stats B4
+note C5 midi 72 f 523.251 Hz
+stats C5
+tone A5 880 Hz 100 ms
+scale done

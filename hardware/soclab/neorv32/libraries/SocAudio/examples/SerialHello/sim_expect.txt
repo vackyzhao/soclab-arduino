@@ -1,0 +1,15 @@
+SerialHello
+ctor 42
+dec -12345
+udec 4000000000
+hex BEEF
+bin 1010
+char A
+float 3.142
+negfloat -2.5
+map 127
+constrain 255
+bool 10
+millis 
+send a line
+echo: ping (lost 0)

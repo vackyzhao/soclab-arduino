@@ -1,0 +1,9 @@
+FullScale
+voices 2
+play A4+A4
+stats A4+A4
+play C5+C5
+stats C5+C5
+play A4+E5
+stats A4+E5
+fullscale done
