@@ -41,8 +41,16 @@ KR260 clean Lab3 r6 与 r5b 的功能 RTL 相同；r6 改动音频输出管脚�
 
 这些是数字逻辑仿真，不能代替实际板卡的模拟音频测量。最新 GCC 15.2 的编译结果也不等于这些新增镜像已经执行了同一轮 RTL 仿真。
 
-## 实板边界
+## KR260 实板上传与串口
 
 用户曾在 ZedBoard 上通过手动 GDB `run` 确认闪灯及 440 Hz 声音，这暴露了旧上传脚本只有加载而没有启动 CPU 的问题。本包普通上传现包含 `load → monitor reset run → detach`。
 
-当前记录尚未把该新版标准包的自动上传、KR260 r6 编程后运行、LED 外观或模拟音频实测记为已通过。FPGA r6 的实现报告通过时序分析，但它与实际板卡程序运行属于不同层次的证据。
+本轮已实际把 KR260 的 PL 切换为 clean Lab3 r6，Linux FPGA manager 为 `operating`。PS 上的 OpenOCD 0.12.0 经 AXI GPIO 桥实际识别 IDCODE `0x00000001` 和一个 RV32 hart；运行配置使用该版本支持的 `gdb_report_data_abort enable` 语法。
+
+Windows Arduino CLI 使用本包 0.2.0、GCC 15.2.0-1 及 `soclab:neorv32:kr260:build=board,openocd=remote`，通过 Tailscale 向 PS 的 OpenOCD 上传串口／GPIO 测试程序：
+
+- 程序 4052 B，静态 RAM 668 B；ELF 加载地址和入口均为 `0xE0000000`。
+- 标准上传实际执行 `target extended-remote → load → monitor reset run → detach`，退出码为 0。
+- 此后没有手动 `run`，也没有重新连接 GDB。PS 的 `/dev/ttyS0` 以 115200 baud 持续收到交替的 `LED=1`、`LED=0` 日志，并成功收到发给 CPU 的 `?` 回显。
+
+因此该新版标准包在 KR260 r6 上的上传、上传后自动运行及 PS 与 CPU 双向 UART 已实际通过。这里的 GPIO 日志说明程序执行到对应操作；尚未独立观察 LED 外观或测量模拟音频。ZedBoard 的新版自动上传也尚未实板复核。

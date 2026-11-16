@@ -89,7 +89,7 @@ monitor reset run
 detach
 ```
 
-这样加载后会启动 CPU。`load` 本身只传程序，不能单独证明 CPU 已运行。该版本修正了旧上传流程缺少启动步骤的问题；自动上传流程的实板验证状态见 [验证记录](docs/VALIDATION.md)。
+这样加载后会启动 CPU。`load` 本身只传程序，不能单独证明 CPU 已运行。该版本修正了旧上传流程缺少启动步骤的问题；KR260 r6 已实际通过远端上传、上传后自动运行及双向串口验证，见 [验证记录](docs/VALIDATION.md)。
 
 - **Local**：本机 `127.0.0.1:3333`。
 - **Remote**：在本机 `boards.local.txt` 中配置目标 IP；可填 Tailscale 地址。
