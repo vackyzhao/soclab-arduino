@@ -267,6 +267,31 @@ long random(long min, long max)
     return min + (long)(rnd_next() % (uint32_t)(max - min));
 }
 
+// ---------------------------------------------------------------- analog output
+static uint8_t analog_write_bits = 8;
+extern "C" void __arduino_analog_write(uint8_t, uint32_t, uint8_t) __attribute__((weak));
+
+void analogWriteResolution(int bits)
+{
+    analog_write_bits = (uint8_t)((bits < 1) ? 1 : ((bits > 24) ? 24 : bits));
+}
+
+void analogWrite(uint8_t pin, int value)
+{
+    uint8_t bits = analog_write_bits;
+    uint32_t maximum = (1u << bits) - 1u;
+    uint32_t v = value < 0 ? 0u : (uint32_t)value;
+    if (v > maximum)
+        v = maximum;
+    if (pin == DAC_LEFT || pin == DAC_RIGHT) {
+        if (__arduino_analog_write)
+            __arduino_analog_write(pin, v, bits);
+    } else if (pin < NUM_DIGITAL_PINS) {
+        pinMode(pin, OUTPUT);
+        digitalWrite(pin, v >= (1u << (bits - 1)) ? HIGH : LOW);
+    }
+}
+
 // ---------------------------------------------------------------- tone
 extern "C" void __arduino_tone(uint8_t, unsigned int, unsigned long) __attribute__((weak));
 extern "C" void __arduino_no_tone(uint8_t) __attribute__((weak));

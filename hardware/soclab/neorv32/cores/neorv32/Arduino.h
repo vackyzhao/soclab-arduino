@@ -70,6 +70,9 @@
 #define LED_D2           20
 #define LED_D3           21   // gpio_o[21]
 #define PIN_AUDIO_LOW    22   // gpio_i[22]: audio FIFO level below FIFO_LOW
+// Virtual DAC pins: the two existing sigma-delta outputs, not GPIO indices.
+#define DAC_LEFT        0x80
+#define DAC_RIGHT       0x81
 #define NOT_AN_INTERRUPT (-1)
 #define digitalPinToInterrupt(p) (((p) >= 0 && (p) < NUM_DIGITAL_PINS) ? (p) : NOT_AN_INTERRUPT)
 
@@ -142,6 +145,14 @@ void pinMode(uint8_t pin, uint8_t mode);
 void digitalWrite(uint8_t pin, uint8_t val);
 int  digitalRead(uint8_t pin);
 void digitalToggle(uint8_t pin);
+
+// Sigma-delta DAC average level, default 8 bits (0..255). Include <SocAudio.h>
+// so the IDE links its backend. Resolution is clamped to 1..24 bits; values
+// are clamped to the selected unsigned range. Requires an external low-pass
+// filter for an analog level. Ordinary GPIO pins use a digital half-scale
+// threshold because this SoC has no GPIO PWM peripheral.
+void analogWrite(uint8_t pin, int value);
+void analogWriteResolution(int bits);
 
 // ---------------------------------------------------------------- interrupts
 typedef void (*voidFuncPtr)(void);

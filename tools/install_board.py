@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install/update SoCLab + latest stable xPack GCC/GDB without sudo/PATH edits."""
+"""Install/update SoCLab and native GCC/GDB without sudo or PATH edits."""
 import argparse
 import hashlib
 import json
@@ -15,6 +15,7 @@ from pathlib import Path
 
 API = "https://api.github.com/repos/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases/"
 TOOL_NAME = "xpack-riscv-none-elf-gcc"
+PYTHON_VERSION = "3.12.16"
 
 
 def source_platform():
@@ -52,13 +53,17 @@ def default_sketchbook():
 
 def host_flavour():
     machine = platform.machine().lower()
-    if os.name == "nt" and machine in ("amd64", "x86_64"):
+    # Windows 11 on ARM64 can run the packaged x64 Python and x64 toolchain.
+    # This is the Windows compatibility path, not a native ARM64 compiler.
+    if os.name == "nt" and machine in ("amd64", "x86_64", "arm64", "aarch64"):
         return "win32-x64.zip", "x86_64-mingw32"
     if sys.platform.startswith("linux"):
         if machine in ("amd64", "x86_64"):
             return "linux-x64.tar.gz", "x86_64-linux-gnu"
         if machine in ("aarch64", "arm64"):
             return "linux-arm64.tar.gz", "aarch64-linux-gnu"
+        if machine == "riscv64":
+            return "riscv64-riscv32-none-elf.tar.xz", "riscv64-linux-gnu"
     if sys.platform == "darwin":
         return ("darwin-arm64.tar.gz", "arm64-apple-darwin") if machine == "arm64" else ("darwin-x64.tar.gz", "x86_64-apple-darwin")
     raise RuntimeError("No native official asset for this host: " + sys.platform + "/" + machine)
@@ -116,28 +121,28 @@ def download(asset, cache):
     return archive
 
 
-def valid_toolchain(directory):
+def valid_toolchain(directory, prefix="riscv-none-elf-"):
     suffix = ".exe" if os.name == "nt" else ""
-    return all((directory / "bin" / ("riscv-none-elf-" + name + suffix)).is_file() for name in ("gcc", "gdb"))
+    return all((directory / "bin" / (prefix + name + suffix)).is_file() for name in ("gcc", "gdb"))
 
 
-def unpack(archive, destination):
+def unpack(archive, destination, prefix="riscv-none-elf-"):
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="soclab-unpack-", dir=destination.parent) as tmp:
         shutil.unpack_archive(str(archive), tmp)
-        roots = [p for p in Path(tmp).iterdir() if p.is_dir() and valid_toolchain(p)]
+        roots = [p for p in Path(tmp).iterdir() if p.is_dir() and valid_toolchain(p, prefix)]
         if len(roots) != 1:
-            raise RuntimeError("Expected one xPack GCC/GDB directory in archive")
+            raise RuntimeError("Expected one native GCC/GDB directory in archive (prefix " + prefix + ")")
         if destination.exists():
             raise RuntimeError("Incomplete tool directory exists; move it aside before retrying: " + str(destination))
         roots[0].rename(destination)
     return destination
 
 
-def check_programs(directory):
+def check_programs(directory, prefix="riscv-none-elf-"):
     suffix = ".exe" if os.name == "nt" else ""
     for name in ("gcc", "gdb"):
-        program = directory / "bin" / ("riscv-none-elf-" + name + suffix)
+        program = directory / "bin" / (prefix + name + suffix)
         result = subprocess.run([str(program), "--version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, errors="replace", timeout=20)
         if result.returncode:
@@ -145,7 +150,32 @@ def check_programs(directory):
         print(result.stdout.splitlines()[0], flush=True)
 
 
-def install_platform(source, sketchbook, toolchain):
+def python_program(directory):
+    candidates = (directory / "python.exe",) if os.name == "nt" else (directory / "bin/python3", directory / "bin/python")
+    return next((p for p in candidates if p.is_file()), None)
+
+
+def install_python_runtime(source, sketchbook):
+    """Keep the interpreter in the sketchbook after the download folder is removed."""
+    source = source.resolve()
+    if python_program(source) is None:
+        raise RuntimeError("Python runtime has no host interpreter: " + str(source))
+    destination = sketchbook / "tools/soclab/python" / PYTHON_VERSION
+    if source != destination.resolve():
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(source, destination, dirs_exist_ok=True, symlinks=True)
+    program = python_program(destination)
+    if program is None:
+        raise RuntimeError("Copied Python runtime has no interpreter: " + str(destination))
+    result = subprocess.run([str(program), "--version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, errors="replace", timeout=20)
+    if result.returncode:
+        raise RuntimeError(str(program) + " cannot start:\n" + result.stdout)
+    print(result.stdout.strip(), flush=True)
+    return program.resolve()
+
+
+def install_platform(source, sketchbook, toolchain, compiler_prefix=None, python=None):
     target = sketchbook / "hardware/soclab/neorv32"
     if source.resolve() != target.resolve():
         for src in source.rglob("*"):
@@ -155,8 +185,16 @@ def install_platform(source, sketchbook, toolchain):
                 shutil.copy2(src, dst)
     local = target / "platform.local.txt"
     text = local.read_text(encoding="utf-8") if local.is_file() else ""
-    lines = [line for line in text.splitlines() if not re.match(r"\s*compiler\.path\s*=", line)]
-    lines.append("compiler.path=" + (toolchain.resolve() / "bin").as_posix() + "/")
+    properties = {"compiler.path": (toolchain.resolve() / "bin").as_posix() + "/"}
+    if compiler_prefix is not None:
+        properties["compiler.prefix"] = compiler_prefix
+    interpreter = python.resolve() if python is not None else Path(sys.executable).resolve()
+    properties["soclab.python"] = interpreter.as_posix()
+    if os.name == "nt":
+        properties["soclab.python.windows"] = interpreter.as_posix()
+    lines = [line for line in text.splitlines()
+             if not any(re.match(r"\s*" + re.escape(key) + r"\s*=", line) for key in properties)]
+    lines.extend(key + "=" + value for key, value in properties.items())
     pending = local.with_name("platform.local.txt.tmp")
     pending.write_text("\n".join(lines) + "\n", encoding="utf-8")
     pending.replace(local)
@@ -169,11 +207,25 @@ def main(argv=None):
     parser.add_argument("--version", help="particular release instead of latest stable")
     parser.add_argument("--archive", type=Path, help="official archive copied from another computer")
     parser.add_argument("--offline", action="store_true", help="use installed/cached release without GitHub access")
+    parser.add_argument("--python-runtime", type=Path, help="complete Python root to keep inside the Arduino sketchbook")
     args = parser.parse_args(argv)
     source = source_platform()
     flavour, host = host_flavour()
     pinned = json.loads((source / "tools/toolchain.json").read_text(encoding="utf-8"))
-    if args.offline:
+    pinned_asset = next((s for s in pinned["systems"] if s["host"] == host), None)
+    if host == "riscv64-linux-gnu" and pinned_asset is None:
+        raise RuntimeError("No native RISC-V host toolchain is configured in tools/toolchain.json")
+    provider = pinned_asset.get("provider", "xpack") if pinned_asset else "xpack"
+    prefix = pinned_asset.get("compilerPrefix", "riscv-none-elf-") if pinned_asset else "riscv-none-elf-"
+    tool_name = TOOL_NAME if provider == "xpack" else provider + "-toolchain"
+    if provider != "xpack":
+        # RISCstar publishes a native RV64-host/RV32-target package separately
+        # from xPack. Never ask the xPack API for an unsupported host.
+        version = args.version.lstrip("v") if args.version else pinned_asset.get("version", pinned["version"])
+        asset = pinned_asset if version == pinned_asset.get("version", pinned["version"]) else None
+        if asset is None and args.archive is None:
+            raise RuntimeError("Provider " + provider + " has no configured archive for " + version + "; supply --archive")
+    elif args.offline:
         version = args.version.lstrip("v") if args.version else None
         if args.archive and version is None:
             match = re.fullmatch(re.escape(TOOL_NAME) + r"-(.+)-" + re.escape(flavour), args.archive.name)
@@ -181,11 +233,11 @@ def main(argv=None):
                 raise RuntimeError("Use an official archive filename or specify --version")
             version = match.group(1)
         version = version or pinned["version"]
-        asset = next((s for s in pinned["systems"] if s["host"] == host), None) if version == pinned["version"] else None
+        asset = pinned_asset if version == pinned["version"] else None
     else:
         version, asset = release_tool(args.version.lstrip("v") if args.version else None, flavour, host)
-    destination = args.sketchbook / "tools/soclab" / TOOL_NAME / version
-    if valid_toolchain(destination):
+    destination = args.sketchbook / "tools/soclab" / tool_name / version
+    if valid_toolchain(destination, prefix):
         directory = destination
         print("Reusing installed", directory, flush=True)
     else:
@@ -196,9 +248,10 @@ def main(argv=None):
             cache = args.sketchbook / "tools/soclab/downloads"
             archive = cache / asset["archiveFileName"] if args.offline else download(asset, cache)
         check_archive(archive, asset)
-        directory = unpack(archive, destination)
-    check_programs(directory)
-    target = install_platform(source, args.sketchbook, directory)
+        directory = unpack(archive, destination, prefix)
+    check_programs(directory, prefix)
+    python = install_python_runtime(args.python_runtime, args.sketchbook) if args.python_runtime else None
+    target = install_platform(source, args.sketchbook, directory, prefix, python)
     print("Installed board:", target)
     print("Configured:", target / "platform.local.txt")
     print("No sudo or PATH edit needed; future compilation uses the installed files offline.")

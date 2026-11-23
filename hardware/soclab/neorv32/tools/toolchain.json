@@ -36,6 +36,16 @@
       "archiveFileName": "xpack-riscv-none-elf-gcc-15.2.0-1-darwin-arm64.tar.gz",
       "size": "401163559",
       "checksum": "SHA-256:6588e8351455fad8aca37551f0e5a5543f3346bfa9a837cf03cbd3bdd4989f8f"
+    },
+    {
+      "host": "riscv64-linux-gnu",
+      "provider": "soclab",
+      "version": "2026.11.23",
+      "compilerPrefix": "riscv-none-elf-",
+      "url": "https://github.com/vackyzhao/soclab-arduino/releases/download/v0.3.0/soclab-riscv-toolchain-2026.11.23-linux-riscv64.tar.gz",
+      "archiveFileName": "soclab-riscv-toolchain-2026.11.23-linux-riscv64.tar.gz",
+      "size": "103068475",
+      "checksum": "SHA-256:73972b5056290f2e23eba06dbb6ece430c1040d299dd64146b4253c4830dea02"
     }
   ]
 }

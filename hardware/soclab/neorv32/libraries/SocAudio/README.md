@@ -25,6 +25,12 @@ This produces a continuous 440 Hz sine through the hardware audio output. It doe
 
 ## API
 
+For two independent static average levels, use `analogWrite(DAC_LEFT, value)`
+and `analogWrite(DAC_RIGHT, value)` after including this library. See
+[analogWrite and its mode switching](ANALOG_WRITE.md) and the
+`AnalogWriteStereo` example. This is a sigma-delta pulse stream requiring
+external filtering; an AC-coupled audio path does not pass DC.
+
 | Call | Behavior |
 | --- | --- |
 | `Audio.begin(lowWater = 0)` | Reset the FIFO and enable the DAC. |
@@ -53,10 +59,16 @@ Do not mix direct `Audio.write()` calls with a running `Synth`: they share one F
 
 Open **File > Examples > SocAudio** after installation.
 
+See the [Chinese examples guide](EXAMPLES.md) for a learning path, wiring,
+UART access, sample formats, and the distinction between PCM playback and synthesis.
+
 | Example | Purpose |
 | --- | --- |
 | `SimpleTone` | Minimal continuous 440 Hz sine with the default interrupt synth. |
 | `SinePolling` | Write a 109-sample sine table directly to both channels (about 440.37 Hz). |
+| `CourseBlinky` | Reconstructed `blinky.elf`: GPIO20/21 blink together every 250 ms. |
+| `CourseDacSine` | Reconstructed `dac_sin.elf`: exact 109-point table, polling refill and original LED counter. |
+| `CourseDacSineIRQ` | Reconstructed `dac_sin_ir.elf`: GPIO22 rising-edge flag, main-loop refill at a 128-frame low threshold. |
 | `ToneScale` | Play a scale using the interrupt synth and print timing statistics. |
 | `Chord` | Mix three/four sine voices. Use at least 4 synth voices. |
 | `FullScale` | Check two-voice peak amplitude. Select **Synth voices: 2** for the stated full-scale result. |
@@ -64,9 +76,26 @@ Open **File > Examples > SocAudio** after installation.
 | `SerialSynth` | Exercise UART input/output while the synth runs. |
 | `PinInterrupt` | Exercise FIFO-low GPIO interrupt modes; intentionally emits silent frames. |
 | `Blink` | Basic board LEDs and timing, using the core API. |
+| [`BreathingLED`](examples/BreathingLED/README.md) | KR260 UF1/UF2 opposite fades: 500 Hz software PWM with a 4-second period; one UART dot per second. |
 | `SerialHello` | Basic UART and `Print` formatting, using the core API. |
+| [`BlinkWithoutDelay`](examples/BlinkWithoutDelay/README.md) | Independent 500/700 ms LED timers without blocking the main loop. |
+| [`SerialCommandConsole`](examples/SerialCommandConsole/README.md) | Fixed-buffer 115200-baud commands for both LEDs; CR/LF and oversized-line handling. |
+| [`TimingAndRandom`](examples/TimingAndRandom/README.md) | Timer differences, repeatable random numbers, mapping, and bit helpers. |
+| [`StereoChannelTest`](examples/StereoChannelTest/README.md) | Left 440 Hz, right 660 Hz, both, then silence using direct PCM. |
+| [`WaveformPlayer`](examples/WaveformPlayer/README.md) | Runtime sine, triangle, saw, and square PCM waveforms. |
+| [`PcmClipPlayer`](examples/PcmClipPlayer/README.md) | An authored finite 16-bit PCM clip, copied to RAM and played with `write16`; Python generator included. |
+| [`NonBlockingMelody`](examples/NonBlockingMelody/README.md) | Schedule notes and rests while continuing to handle other work. |
+| [`PitchGlide`](examples/PitchGlide/README.md) | Change a sustained voice from 220 to 880 Hz and back without restarting its envelope. |
+| [`SynthSerialControl`](examples/SynthSerialControl/README.md) | Play notes, adjust volume, and inspect synth state over 115200-baud UART. |
+| `AnalogWriteStereo` | Complementary 8-bit static average levels on the existing sigma-delta outputs. |
+| [`DacResolution`](examples/DacResolution/README.md) | Compare 8/12/24-bit static DAC values at five complementary levels. |
 
 `SYNTH_VOICES` defaults to 4 and can be set to 1..16 using the board menu. A sketch-only `#define SYNTH_VOICES` does not configure the separately compiled library. The voice count divides the maximum amplitude per voice; use the appropriate count when comparing loudness.
+
+The `Course*` examples reconstruct observable behavior from the course ELF files;
+they are not recovered original source files. Both audio tables preserve every
+24-bit sample. The Arduino runtime and `Audio` API replace the original startup
+and register helper functions. See [reconstruction notes](COURSE_ELF.md).
 
 ## Source and license status
 

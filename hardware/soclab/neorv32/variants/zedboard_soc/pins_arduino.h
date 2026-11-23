@@ -21,4 +21,8 @@
 #define PIN_AUDIO_LOW 22
 #define AUDIO_LOW_PIN 22
 
+// Virtual pins for the existing stereo sigma-delta DAC, not GPIO numbers.
+#define DAC_LEFT  0x80
+#define DAC_RIGHT 0x81
+
 #endif // PINS_ARDUINO_H

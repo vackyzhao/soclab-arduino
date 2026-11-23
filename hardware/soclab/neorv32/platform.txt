@@ -10,7 +10,7 @@
 # https://arduino.github.io/arduino-cli/latest/platform-specification/
 
 name=KIT SoC Lab NEORV32
-version=0.2.0
+version=0.3.0
 
 # defaults of the board menu properties (boards.txt sets them)
 build.arduino_sim=0
@@ -28,7 +28,7 @@ build.rom_size=64k
 #   compiler.path=/home/<user>/opt/xpack-riscv-none-elf-gcc-15.2.0-1/bin/
 # (with the trailing slash; Windows: C:/.../bin/), or for arduino-cli
 #   arduino-cli compile --build-property compiler.path=/.../bin/ ...
-compiler.path={runtime.tools.xpack-riscv-none-elf-gcc-15.2.0-1.path}/bin/
+compiler.path={runtime.tools.soclab-riscv-toolchain.path}/bin/
 compiler.prefix=riscv-none-elf-
 compiler.c.cmd={compiler.prefix}gcc
 compiler.cpp.cmd={compiler.prefix}gcc
@@ -39,8 +39,8 @@ compiler.objcopy.cmd={compiler.prefix}objcopy
 compiler.size.cmd={compiler.prefix}size
 
 # Python 3 (standard library only) for the .hex image (tools/bin2hex.py)
-soclab.python=python3
-soclab.python.windows=python
+soclab.python={runtime.tools.soclab-python-runtime.path}/bin/python3
+soclab.python.windows={runtime.tools.soclab-python-runtime.path}/python.exe
 
 # ---------------------------------------------------------------- flags
 # common.mk CC_OPTS with MARCH / MABI of build.mk, EFFORT = Optimize menu
@@ -158,6 +158,18 @@ tools.gdb.server=127.0.0.1:3333
 tools.gdb.upload.params.verbose=
 tools.gdb.upload.params.quiet=-q
 tools.gdb.upload.pattern="{path}{cmd}" -batch -nx {upload.verbose} -ex "set confirm off" -ex "target extended-remote {server}" -ex "load" -ex "monitor reset run" -ex "detach" "{build.path}/{build.project_name}.elf"
+
+# Native UART loader requires the matching bootROM hardware image.
+# Personal SSH address belongs in boards.local.txt.
+tools.uartssh.ssh=ubuntu@192.0.2.1
+tools.uartssh.device=/dev/ttyS0
+tools.uartssh.resetaddress=0xA0030000
+tools.uartssh.upload.params.verbose=
+tools.uartssh.upload.params.quiet=
+tools.uartssh.upload.pattern="{soclab.python}" "{runtime.platform.path}/tools/uart_upload.py" --bin "{build.path}/{build.project_name}.bin" --ssh "{ssh}" --device "{device}" --baud 115200 --reset-address {resetaddress} --ssh-sudo
+tools.uartlocal.upload.params.verbose=
+tools.uartlocal.upload.params.quiet=
+tools.uartlocal.upload.pattern="{soclab.python}" "{runtime.platform.path}/tools/uart_upload.py" --bin "{build.path}/{build.project_name}.bin" --port "{serial.port}" --baud 115200
 
 # Automated reset/run still needs a board check. "Upload Using Programmer":
 # OpenOCD writes <sketch>.ino.bin at 0xE000_0000, verifies it and resets into the

@@ -39,7 +39,8 @@ public:
     constexpr SocAudioClass() {}
 
     // Reset FIFO + DAC and enable the DAC (CTRL0 = 3, then 2), set FIFO_LOW
-    // (fifo_low = level < lowWater, 0 = never low).
+    // (fifo_low = level < lowWater, 0 = never low). Stops a running Synth and
+    // leaves analogWrite's static-output mode.
     void begin(uint16_t lowWater = 0);
     // Stops the synth if it runs, FIFO reset, DAC off. The DAC output then
     // stays low (= -full scale): a pop. Synth.end() leaves the DAC on.
@@ -57,6 +58,8 @@ public:
     // Signed 24-bit samples, clamped to +-2^23 and masked to 24 bits. The
     // full check and the two register writes run with interrupts off (an
     // interrupt writing frames in between would commit a mixed frame).
+    // The first write after analogWrite clears its pending static frames
+    // and returns ownership to PCM output; begin() is still the usual setup.
     size_t write(int32_t left, int32_t right);
     size_t write(int32_t mono) { return write(mono, mono); }
     size_t write16(int16_t left, int16_t right) { return write((int32_t)left * 256, (int32_t)right * 256); }

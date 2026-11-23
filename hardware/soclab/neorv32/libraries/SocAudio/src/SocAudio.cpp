@@ -61,6 +61,11 @@ static uint64_t st_t0;
 // synth_stop, set by Synth.begin: Audio.end() stops a running synth without
 // linking the synth into sketches that use Audio only
 static void (*s_stop_hook)(void) = 0;
+// Static average-output mode. The DAC holds these samples after the FIFO
+// empties, so a DC level needs one frame, not an interrupt refill loop.
+static uint8_t s_analog_active = 0;
+static int32_t s_analog_left = SOC_AUDIO_MIN;
+static int32_t s_analog_right = SOC_AUDIO_MIN;
 
 static inline uint32_t __attribute__((always_inline)) rdcycle(void)
 {
@@ -97,15 +102,21 @@ static void set_low_water(uint16_t lw)
 // ================================================================ Audio
 void SocAudioClass::begin(uint16_t lowWater)
 {
+    uint32_t s = __arduino_irq_save();
+    if (s_stop_hook)
+        s_stop_hook();
+    s_analog_active = 0;
     SOC_AUDIO_CTRL0 = SOC_AUDIO_CTRL_RESET | SOC_AUDIO_CTRL_ENABLE;
     SOC_AUDIO_CTRL0 = SOC_AUDIO_CTRL_ENABLE;
     set_low_water(lowWater);
+    __arduino_irq_restore(s);
 }
 
 void SocAudioClass::end()
 {
     if (s_stop_hook)
         s_stop_hook();
+    s_analog_active = 0;
     SOC_AUDIO_CTRL0 = SOC_AUDIO_CTRL_RESET;
     SOC_AUDIO_CTRL0 = 0;
 }
@@ -154,6 +165,13 @@ size_t SocAudioClass::write(int32_t left, int32_t right)
     uint32_t l = to24(left);
     uint32_t r = to24(right) | SOC_AUDIO_COMMIT;
     uint32_t s = __arduino_irq_save();   // full check, L, R + commit: one frame
+    if (s_analog_active) {
+        // Explicit PCM output takes ownership from analogWrite and discards
+        // queued static-level changes before accepting this frame.
+        s_analog_active = 0;
+        SOC_AUDIO_CTRL0 = SOC_AUDIO_CTRL_RESET | SOC_AUDIO_CTRL_ENABLE;
+        SOC_AUDIO_CTRL0 = SOC_AUDIO_CTRL_ENABLE;
+    }
     if (SOC_AUDIO_STAT0 & SOC_AUDIO_STAT_FULL) {
         __arduino_irq_restore(s);
         return 0;                        // a commit into a full FIFO would be dropped
@@ -162,6 +180,36 @@ size_t SocAudioClass::write(int32_t left, int32_t right)
     SOC_AUDIO_R = r;
     __arduino_irq_restore(s);
     return 1;
+}
+
+// Arduino analogWrite backend. Kept independent of SynthClass: the optional
+// stop hook stops a synth only when that synth was actually linked/started.
+extern "C" void __arduino_analog_write(uint8_t pin, uint32_t value, uint8_t bits)
+{
+    uint32_t maximum = (1u << bits) - 1u;
+    uint32_t offset = (uint32_t)(((uint64_t)value * 0x00FFFFFFu + maximum / 2u) / maximum);
+    int32_t sample = (int32_t)offset - 8388608L;
+    uint32_t s = __arduino_irq_save();
+    if (!s_analog_active || !(SOC_AUDIO_CTRL0 & SOC_AUDIO_CTRL_ENABLE)) {
+        if (s_stop_hook)
+            s_stop_hook();
+        SOC_AUDIO_CTRL0 = SOC_AUDIO_CTRL_RESET | SOC_AUDIO_CTRL_ENABLE;
+        SOC_AUDIO_CTRL0 = SOC_AUDIO_CTRL_ENABLE;
+        SOC_AUDIO_FIFO_LOW = 0;
+        s_analog_left = SOC_AUDIO_MIN;
+        s_analog_right = SOC_AUDIO_MIN;
+        s_analog_active = 1;
+    }
+    if (pin == DAC_LEFT)
+        s_analog_left = sample;
+    else
+        s_analog_right = sample;
+    // A rapid caller can fill 256 frames. At most one 48-kHz frame elapses
+    // before space appears; keep L/R and the retained values atomic.
+    while (SOC_AUDIO_STAT0 & SOC_AUDIO_STAT_FULL) {}
+    SOC_AUDIO_L = (uint32_t)s_analog_left & 0x00FFFFFFu;
+    SOC_AUDIO_R = ((uint32_t)s_analog_right & 0x00FFFFFFu) | SOC_AUDIO_COMMIT;
+    __arduino_irq_restore(s);
 }
 
 // ================================================================ render (DMEM)
@@ -396,7 +444,9 @@ void SynthClass::begin(uint8_t mode, uint16_t lowWater)
         mixbuf[n] = 0;
     s_mode = mode;
     uint16_t lw = (mode == SYNTH_IRQ) ? lowWater : 0;   // no low flag in polling mode
-    if (SOC_AUDIO_CTRL0 & SOC_AUDIO_CTRL_ENABLE)
+    if (s_analog_active)
+        Audio.begin(lw);   // leave static DAC mode and discard its queued frames
+    else if (SOC_AUDIO_CTRL0 & SOC_AUDIO_CTRL_ENABLE)
         SOC_AUDIO_FIFO_LOW = lw;   // DAC already on (Audio.begin, Synth.end): no reset, no pop
     else
         Audio.begin(lw);

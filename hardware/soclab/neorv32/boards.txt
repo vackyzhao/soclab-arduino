@@ -12,6 +12,7 @@ menu.timescale=Time scale (Simulation build)
 menu.voices=Synth voices (SocAudio)
 menu.opt=Optimize
 menu.openocd=OpenOCD target
+menu.uploadmethod=Upload method
 
 zedboard.name=KIT SoC Lab - ZedBoard + NEORV32
 
@@ -111,6 +112,20 @@ kr260.upload.tool.default=gdb
 kr260.upload.protocol=gdb
 kr260.upload.maximum_size=131072
 kr260.upload.maximum_data_size=16384
+# Resume the BRAM entry point after loading, with either r6 or UART bootROM.
+kr260.tools.gdb.upload.pattern="{path}{cmd}" -batch -nx {upload.verbose} -ex "set confirm off" -ex "target extended-remote {server}" -ex "monitor reset halt" -ex "load" -ex "monitor resume 0xE0000000" -ex "detach" "{build.path}/{build.project_name}.elf"
+kr260.menu.uploadmethod.gdb=GDB / OpenOCD
+kr260.menu.uploadmethod.gdb.upload.tool=gdb
+kr260.menu.uploadmethod.gdb.upload.tool.default=gdb
+kr260.menu.uploadmethod.gdb.upload.protocol=gdb
+kr260.menu.uploadmethod.uartssh=UART 115200 through KR260 SSH (configure boards.local.txt)
+kr260.menu.uploadmethod.uartssh.upload.tool=uartssh
+kr260.menu.uploadmethod.uartssh.upload.tool.default=uartssh
+kr260.menu.uploadmethod.uartssh.upload.protocol=neorv32-uart
+kr260.menu.uploadmethod.uartlocal=UART 115200 through local serial port
+kr260.menu.uploadmethod.uartlocal.upload.tool=uartlocal
+kr260.menu.uploadmethod.uartlocal.upload.tool.default=uartlocal
+kr260.menu.uploadmethod.uartlocal.upload.protocol=neorv32-uart
 kr260.menu.openocd.local=Local 127.0.0.1:3333
 kr260.menu.openocd.local.tools.gdb.server=127.0.0.1:3333
 kr260.menu.openocd.remote=Remote 192.0.2.1:3333 (edit boards.local.txt)

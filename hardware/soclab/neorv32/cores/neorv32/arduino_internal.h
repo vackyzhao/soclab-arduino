@@ -48,6 +48,8 @@ static inline __attribute__((always_inline)) void __arduino_irq_restore(uint32_t
 // tone() does nothing without it)
 void __arduino_tone(uint8_t pin, unsigned int frequency, unsigned long duration_ms);
 void __arduino_no_tone(uint8_t pin);
+// Optional SocAudio backend, weakly referenced by wiring.cpp.
+void __arduino_analog_write(uint8_t pin, uint32_t value, uint8_t bits);
 
 #ifdef __cplusplus
 }
